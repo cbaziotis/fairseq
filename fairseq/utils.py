@@ -356,7 +356,6 @@ def import_user_module(args):
         if module_name not in sys.modules:
             sys.path.insert(0, module_parent)
             importlib.import_module(module_name)
-            sys.path.pop(0)
 
 
 def softmax(x, dim: int, onnx_trace: bool = False):
@@ -511,3 +510,8 @@ def new_arange(x, *size):
     if len(size) == 0:
         size = x.size()
     return torch.arange(size[-1], device=x.device).expand(*size).contiguous()
+
+
+def get_tpu_device(args):
+    import torch_xla.core.xla_model as xm
+    return xm.xla_device()
