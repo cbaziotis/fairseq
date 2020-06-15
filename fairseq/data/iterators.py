@@ -240,7 +240,6 @@ class EpochBatchIterator(EpochBatchIterating):
 
     def next_epoch_itr(self, shuffle=True, fix_batches_to_gpus=False):
         """Return a new iterator over the dataset.
-
         Args:
             shuffle (bool, optional): shuffle batches before returning the
                 iterator (default: True).
@@ -256,7 +255,9 @@ class EpochBatchIterator(EpochBatchIterating):
             self._cur_epoch_itr = self._get_iterator_for_epoch(
                 self.epoch, shuffle, fix_batches_to_gpus=fix_batches_to_gpus,
             )
-        self.dataset.set_epoch(self.epoch)
+        # todo: fix iterator size bug https://github.com/pytorch/fairseq/issues/1274
+        # this is a temporary solution to avoid crashing after the first epoch
+        # self.dataset.set_epoch(self.epoch)
         self.shuffle = shuffle
         return self._cur_epoch_itr
 
