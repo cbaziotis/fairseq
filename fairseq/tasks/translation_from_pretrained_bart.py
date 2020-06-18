@@ -48,9 +48,7 @@ class TranslationFromPretrainedBARTTask(TranslationTask):
                                  'you should always add all pretraining language idx during finetuning.')
 
         parser.add_argument('--prepend-bos', action='store_true',
-                            help='prepend bos token to each sentence. '
-                                 'this aligns with how mBART was pretrained.')
-
+                            help='prepend beginning of sentence token (<s>).')
         # fmt: on
 
     def __init__(self, args, src_dict, tgt_dict):
@@ -124,7 +122,7 @@ class TranslationFromPretrainedBARTTask(TranslationTask):
     def _inference_with_bleu(self, generator, sample, model):
         import sacrebleu
 
-        def decode(toks, escape_unk=False, **kwargs):
+        def decode(toks, escape_unk=False):
             s = self.tgt_dict.string(
                 toks.int().cpu(),
                 self.args.eval_bleu_remove_bpe,
@@ -135,7 +133,7 @@ class TranslationFromPretrainedBARTTask(TranslationTask):
                 # reference, but doesn't get split into multiple tokens.
                 unk_string=(
                     "UNKNOWNTOKENINREF" if escape_unk else "UNKNOWNTOKENINHYP"
-                ), **kwargs
+                ),
             )
             if self.tokenizer:
                 s = self.tokenizer.decode(s)
@@ -143,18 +141,20 @@ class TranslationFromPretrainedBARTTask(TranslationTask):
 
         gen_out = self.inference_step(generator, [model], sample, None)
         hyps, refs = [], []
-        eos = self.tgt_dict.index('[{}]'.format(self.args.target_lang))
         for i in range(len(gen_out)):
-            hyps.append(decode(gen_out[i][0]['tokens'],
-                               extra_symbols_to_ignore=[eos]))
+            hyps.append(decode(gen_out[i][0]['tokens']))
             refs.append(decode(
                 utils.strip_pad(sample['target'][i], self.tgt_dict.pad()),
                 escape_unk=True,  # don't count <unk> as matches to the hypo
-                extra_symbols_to_ignore=[eos]
             ))
         if self.args.eval_bleu_print_samples:
             logger.info('example hypothesis: ' + hyps[0])
             logger.info('example reference: ' + refs[0])
+
+        lang_token = '[{}]'.format(self.args.target_lang)
+        hyps = [h.replace(lang_token, "") for h in hyps]
+        refs = [r.replace(lang_token, "") for r in refs]
+
         if self.args.eval_tokenized_bleu:
             return sacrebleu.corpus_bleu(hyps, [refs], tokenize='none')
         else:
